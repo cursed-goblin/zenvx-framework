@@ -1,0 +1,19 @@
+{
+  "name": "zenvx-framework",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Visual OS construction kit. Drag blocks, get a Linux distro.",
+  "workspaces": [
+    "packages/schema",
+    "packages/studio",
+    "packages/forge"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @zenvx/studio",
+    "dev:forge": "npm run dev --workspace @zenvx/forge",
+    "build": "npm run build --workspace @zenvx/schema && npm run build --workspace @zenvx/studio",
+    "demo": "node demo/build-demo.mjs",
+    "typecheck": "tsc -b packages/schema packages/studio packages/forge"
+  },
+  "license": "MIT"
+}

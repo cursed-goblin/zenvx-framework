@@ -1,0 +1,27 @@
+{
+  "zenvxVersion": 1,
+  "name": "AaruOS",
+  "codename": "firefly",
+  "author": "kid@zenvx",
+  "blocks": [
+    { "uid": "b1", "def": "base.debian-stable", "cfg": {} },
+    { "uid": "b2", "def": "desktop.xfce", "cfg": { "panelPosition": "bottom" } },
+    { "uid": "b3", "def": "look.theme", "cfg": { "accent": "#2783DE", "wallpaper": "space" } },
+    { "uid": "b4", "def": "app.browser", "cfg": {} },
+    { "uid": "b5", "def": "app.paint", "cfg": {} },
+    { "uid": "b6", "def": "app.code", "cfg": {} },
+    { "uid": "b7", "def": "identity.brand", "cfg": { "logo": "rocket", "tagline": "My very own computer" } },
+    { "uid": "b8", "def": "identity.user", "cfg": { "username": "aaru", "autologin": true } },
+    { "uid": "b9", "def": "output.iso", "cfg": { "arch": "amd64" } }
+  ],
+  "edges": [
+    { "from": "b1", "to": "b2" },
+    { "from": "b2", "to": "b3" },
+    { "from": "b2", "to": "b4" },
+    { "from": "b2", "to": "b5" },
+    { "from": "b2", "to": "b6" },
+    { "from": "b1", "to": "b7" },
+    { "from": "b1", "to": "b8" },
+    { "from": "b1", "to": "b9" }
+  ]
+}
