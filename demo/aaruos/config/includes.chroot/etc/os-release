@@ -1,0 +1,6 @@
+PRETTY_NAME="AaruOS"
+NAME="AaruOS"
+ID=aaruos
+ID_LIKE=debian
+VERSION_CODENAME=firefly
+HOME_URL="https://zenvx.dev/distros/aaruos"

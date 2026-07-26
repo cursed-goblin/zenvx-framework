@@ -1,0 +1,21 @@
+{
+  "name": "AaruOS",
+  "sim": {
+    "panel": "bottom",
+    "accent": "#2783DE",
+    "desktopIcons": [
+      {
+        "label": "Internet"
+      },
+      {
+        "label": "Paint"
+      },
+      {
+        "label": "Code"
+      }
+    ],
+    "windowStyle": "square",
+    "wallpaper": "linear-gradient(160deg,#101828,#2783DE)"
+  },
+  "estimatedMb": 2022
+}
