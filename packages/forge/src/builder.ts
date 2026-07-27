@@ -7,8 +7,11 @@ export type Job = {
 	id: string
 	name: string
 	state: "queued" | "running" | "done" | "failed"
+	target: string
 	workdir: string
 	log: string[]
+	artifactPath?: string
+	/** @deprecated use artifactPath */
 	isoPath?: string
 	startedAt: number
 }
@@ -21,6 +24,53 @@ let running = false
 const queue: Job[] = []
 
 export const getJob = (id: string) => jobs.get(id)
+
+/**
+ * What each finish block leaves in the work directory, and the command that
+ * turns the live-build output into it. `convert` is run after build.sh and is
+ * allowed to be undefined when live-build already produced the artifact.
+ */
+const TARGETS: Record<
+	string,
+	{ artifact: (cfg: Record<string, unknown>) => string; convert?: (cfg: Record<string, unknown>) => string }
+> = {
+	"output.iso": { artifact: () => "live-image-amd64.hybrid.iso" },
+	"output.hdd": { artifact: () => "live-image-amd64.img" },
+	"image.qcow2": {
+		artifact: (cfg) => `disk.${String(cfg.format ?? "qcow2")}`,
+		convert: (cfg) => {
+			const fmt = String(cfg.format ?? "qcow2")
+			const opts = fmt === "qcow2" ? `-o cluster_size=${cfg.clusterSize ?? 65536}` : ""
+			return `qemu-img convert -f raw -O ${fmt} ${opts} live-image-amd64.img disk.${fmt} && qemu-img resize disk.${fmt} ${cfg.sizeGb ?? 20}G`
+		},
+	},
+	"image.oci": {
+		artifact: (cfg) => (cfg.format === "docker" ? "image.docker.tar" : "image.oci.tar"),
+		convert: (cfg) => {
+			const out = cfg.format === "docker" ? "docker-archive:image.docker.tar" : "oci-archive:image.oci.tar"
+			return `tar -C chroot -cf rootfs.tar . && skopeo copy tar:rootfs.tar ${out}:${cfg.tag ?? "zenvx/distro:latest"}`
+		},
+	},
+	"image.wsl": {
+		artifact: () => "rootfs.tar.gz",
+		convert: () => "tar -C chroot --numeric-owner -czf rootfs.tar.gz .",
+	},
+	"image.rpi": { artifact: () => "live-image-arm64.img" },
+	"image.netboot": { artifact: () => "live-image-amd64.netboot.tar.gz" },
+	"image.ostree": {
+		artifact: () => "repo",
+		convert: (cfg) =>
+			`ostree --repo=repo init --mode=archive && ostree --repo=repo commit --branch=${cfg.branch ?? "zenvx/stable/x86_64"} chroot`,
+	},
+}
+
+/** The finish block decides the artifact. First one wins. */
+export function targetOf(recipe: Recipe): { id: string; cfg: Record<string, unknown> } {
+	for (const b of recipe.blocks) {
+		if (TARGETS[b.def]) return { id: b.def, cfg: (b.cfg ?? {}) as Record<string, unknown> }
+	}
+	return { id: "output.iso", cfg: {} }
+}
 
 /** Write the compiled virtual file tree to a real directory. */
 export async function materialize(recipe: Recipe): Promise<string> {
@@ -36,40 +86,63 @@ export async function materialize(recipe: Recipe): Promise<string> {
 }
 
 export function enqueue(recipe: Recipe, workdir: string): Job {
+	const target = targetOf(recipe)
 	const job: Job = {
 		id: Math.random().toString(36).slice(2, 10),
 		name: recipe.name,
 		state: "queued",
+		target: target.id,
 		workdir,
 		log: [],
 		startedAt: Date.now(),
 	}
 	jobs.set(job.id, job)
-	queue.push(job)
-	pump()
+	queue.push({ ...job, ...(jobs.get(job.id) as Job) })
+	queue[queue.length - 1] = jobs.get(job.id) as Job
+	pump(target.cfg)
 	return job
 }
 
-function pump() {
+/** Run one shell step in the job workdir, streaming into the job log. */
+function step(job: Job, command: string): Promise<number> {
+	return new Promise((resolve) => {
+		job.log.push(`$ ${command}\n`)
+		const child = spawn("sh", ["-c", command], { cwd: job.workdir })
+		const push = (chunk: Buffer) => {
+			job.log.push(chunk.toString())
+			if (job.log.length > 4000) job.log.splice(0, 2000)
+		}
+		child.stdout.on("data", push)
+		child.stderr.on("data", push)
+		child.on("close", (code) => resolve(code ?? 1))
+	})
+}
+
+async function pump(cfg: Record<string, unknown> = {}) {
 	if (running) return
 	const job = queue.shift()
 	if (!job) return
 	running = true
 	job.state = "running"
 
-	// `lb build` needs root. In production this runs inside the container from
-	// packages/forge/Dockerfile, never on the host.
-	const child = spawn("sh", ["./build.sh"], { cwd: job.workdir })
-	const push = (chunk: Buffer) => {
-		job.log.push(chunk.toString())
-		if (job.log.length > 4000) job.log.splice(0, 2000)
-	}
-	child.stdout.on("data", push)
-	child.stderr.on("data", push)
-	child.on("close", (code) => {
+	const spec = TARGETS[job.target] ?? TARGETS["output.iso"]
+
+	try {
+		// `lb build` needs root. In production this runs inside the container
+		// from packages/forge/Dockerfile, never on the host.
+		let code = await step(job, "sh ./build.sh")
+		if (code === 0 && spec.convert) code = await step(job, spec.convert(cfg))
+
 		job.state = code === 0 ? "done" : "failed"
-		if (code === 0) job.isoPath = join(job.workdir, "live-image-amd64.hybrid.iso")
+		if (code === 0) {
+			job.artifactPath = join(job.workdir, spec.artifact(cfg))
+			job.isoPath = job.artifactPath
+		}
+	} catch (err) {
+		job.state = "failed"
+		job.log.push(String(err))
+	} finally {
 		running = false
-		pump()
-	})
+		void pump()
+	}
 }
