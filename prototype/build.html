@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZenvX forge console</title>
+<style>
+:root{--ink:#2C2C2B;--muted:#7D7A75;--line:#E6E5E3;--brand:#2783DE;--brand-soft:#E5F2FC;--good:#46A171;--bad:#E56458}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;font:14px/1.5 Inter,ui-sans-serif,system-ui,sans-serif;color:var(--ink);background:#F9F8F7}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+p.sub{color:var(--muted);margin:0 0 20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+textarea{width:100%;min-height:220px;padding:12px;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink)}
+textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 16px;min-height:44px;border-radius:8px;cursor:pointer;font:inherit;margin-right:8px}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.btn[disabled]{opacity:.5;cursor:default}
+.status{margin-top:12px;font-size:13px}
+.ok{color:var(--good)}
+.err{color:var(--bad)}
+pre{background:#191919;color:#e8e8e8;padding:12px;border-radius:8px;overflow:auto;max-height:340px;font-size:12px;white-space:pre-wrap}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td.k{color:var(--muted);width:150px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Forge console</h1>
+<p class="sub">This page talks to the real backend on this same address. <strong>Check</strong> builds nothing and is instant. <strong>Build</strong> runs live-build and takes a while.</p>
+
+<div class="card">
+<label for="recipe">Recipe JSON</label>
+<textarea id="recipe" spellcheck="false"></textarea>
+<div style="margin-top:12px">
+<button id="check" class="btn">Check</button>
+<button id="build" class="btn primary">Build for real</button>
+<button id="health" class="btn">Ping backend</button>
+</div>
+<div id="status" class="status"></div>
+</div>
+
+<div class="card" id="out-card" style="display:none">
+<label>Result</label>
+<div id="out"></div>
+</div>
+</div>
+
+<script>
+var EXAMPLE = {
+	zenvxVersion: 1,
+	name: "AaruOS",
+	codename: "firefly",
+	author: "kid@zenvx",
+	blocks: [
+		{ uid: "b1", def: "base.debian-stable", cfg: {} },
+		{ uid: "b2", def: "desktop.xfce", cfg: {} },
+		{ uid: "b3", def: "look.theme", cfg: { accent: "#2783DE", wallpaper: "space" } },
+		{ uid: "b4", def: "app.browser", cfg: {} },
+		{ uid: "b5", def: "app.paint", cfg: {} },
+		{ uid: "b6", def: "app.code", cfg: {} },
+		{ uid: "b7", def: "identity.brand", cfg: { name: "AaruOS", icon: "rocket" } },
+		{ uid: "b8", def: "identity.user", cfg: { username: "aaru", autologin: true } },
+		{ uid: "b9", def: "output.iso", cfg: {} }
+	],
+	edges: [
+		{ from: "b1", to: "b2" },
+		{ from: "b2", to: "b3" },
+		{ from: "b2", to: "b4" },
+		{ from: "b2", to: "b5" },
+		{ from: "b2", to: "b6" },
+		{ from: "b1", to: "b7" },
+		{ from: "b1", to: "b8" },
+		{ from: "b1", to: "b9" }
+	]
+};
+
+var $ = function (id) { return document.getElementById(id) };
+$("recipe").value = JSON.stringify(EXAMPLE, null, 2);
+
+function say(msg, cls) {
+	$("status").className = "status " + (cls || "");
+	$("status").textContent = msg;
+}
+function show(node) {
+	$("out-card").style.display = "block";
+	$("out").textContent = "";
+	$("out").appendChild(node);
+}
+function table(rows) {
+	var t = document.createElement("table");
+	rows.forEach(function (r) {
+		var tr = document.createElement("tr");
+		var k = document.createElement("td"); k.className = "k"; k.textContent = r[0];
+		var v = document.createElement("td"); v.textContent = r[1];
+		tr.appendChild(k); tr.appendChild(v); t.appendChild(tr);
+	});
+	return t;
+}
+function readRecipe() {
+	try { return JSON.parse($("recipe").value) }
+	catch (e) { say("That is not valid JSON: " + e.message, "err"); return null }
+}
+function post(path, body) {
+	return fetch(path, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body)
+	}).then(function (r) { return r.json().then(function (j) { return { code: r.status, body: j } }) });
+}
+
+$("health").addEventListener("click", function () {
+	say("Pinging\u2026");
+	fetch("/api/health").then(function (r) { return r.json() }).then(function (j) {
+		say("Backend is up. Serving " + j.webRoot, "ok");
+	}).catch(function () {
+		say("No backend on this address. Start it with: docker compose up --build", "err");
+	});
+});
+
+$("check").addEventListener("click", function () {
+	var recipe = readRecipe();
+	if (!recipe) return;
+	say("Compiling\u2026");
+	post("/api/compile", recipe).then(function (r) {
+		if (r.code !== 200) {
+			say("The recipe was rejected.", "err");
+			var pre = document.createElement("pre");
+			pre.textContent = JSON.stringify(r.body.issues || r.body, null, 2);
+			return show(pre);
+		}
+		var b = r.body;
+		say("Compiled. Nothing was built.", "ok");
+		var box = document.createElement("div");
+		box.appendChild(table([
+			["Files", String((b.files || []).length)],
+			["Packages", String((b.packages || []).length)],
+			["Estimated size", (b.estimatedMb || 0) + " MB"],
+			["Warnings", String((b.issues || []).length)]
+		]));
+		var pre = document.createElement("pre");
+		pre.textContent = (b.files || []).map(function (f) { return f.path }).join("\n") +
+			"\n\n--- packages ---\n" + (b.packages || []).join(" ");
+		box.appendChild(pre);
+		show(box);
+	}).catch(function () {
+		say("Could not reach the backend. Is it running?", "err");
+	});
+});
+
+var polling = null;
+$("build").addEventListener("click", function () {
+	var recipe = readRecipe();
+	if (!recipe) return;
+	if (polling) clearInterval(polling);
+	$("build").disabled = true;
+	say("Queueing\u2026");
+	post("/api/build", recipe).then(function (r) {
+		if (r.code !== 202) {
+			$("build").disabled = false;
+			say("The recipe was rejected.", "err");
+			var pre = document.createElement("pre");
+			pre.textContent = JSON.stringify(r.body.issues || r.body, null, 2);
+			return show(pre);
+		}
+		var id = r.body.jobId;
+		say("Building job " + id + " (" + r.body.target + "). This takes a while.");
+		var log = document.createElement("pre");
+		log.textContent = "waiting for output\u2026";
+		show(log);
+		polling = setInterval(function () {
+			fetch("/api/build/" + id).then(function (x) { return x.json() }).then(function (job) {
+				log.textContent = (job.log || []).join("");
+				log.scrollTop = log.scrollHeight;
+				if (job.state === "done") {
+					clearInterval(polling); polling = null;
+					$("build").disabled = false;
+					say("Done. Artifact: " + job.artifactPath, "ok");
+				} else if (job.state === "failed") {
+					clearInterval(polling); polling = null;
+					$("build").disabled = false;
+					say("The build failed. The log above says why.", "err");
+				}
+			}).catch(function () {
+				clearInterval(polling); polling = null;
+				$("build").disabled = false;
+				say("Lost the backend mid-build.", "err");
+			});
+		}, 2000);
+	}).catch(function () {
+		$("build").disabled = false;
+		say("Could not reach the backend. Is it running?", "err");
+	});
+});
+</script>
+</body>
+</html>

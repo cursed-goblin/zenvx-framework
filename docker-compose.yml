@@ -1,0 +1,28 @@
+# One command to get a real backend:
+#
+#   docker compose up --build
+#
+# Then open http://localhost:8787/build.html
+#
+# privileged is required because live-build calls debootstrap, mounts loop
+# devices and makes a filesystem image. That is genuinely root-level work, so
+# run this on your own machine or a throwaway VM, not on a shared host.
+
+services:
+  forge:
+    build:
+      context: .
+      dockerfile: packages/forge/Dockerfile
+    privileged: true
+    ports:
+      # Bound to localhost only, so nothing is exposed to your network.
+      - "127.0.0.1:8787:8787"
+    environment:
+      PORT: "8787"
+      ZENVX_WORK: /var/lib/zenvx/builds
+      ZENVX_WEB: /srv/zenvx/prototype
+    volumes:
+      - builds:/var/lib/zenvx/builds
+
+volumes:
+  builds:
