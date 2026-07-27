@@ -1,16 +1,10 @@
 {
 	"name": "ZenvX forge",
-	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+	"image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
 
-	// live-build, debootstrap and friends all want to be root. A Codespace is a
-	// disposable VM, so this is the cheap and honest option.
+	// live-build and debootstrap want to be root. A Codespace is a disposable
+	// VM, so this is the cheap and honest option.
 	"remoteUser": "root",
-
-	"features": {
-		"ghcr.io/devcontainers/features/node:1": {
-			"version": "22"
-		}
-	},
 
 	"forwardPorts": [8787],
 	"portsAttributes": {
@@ -21,20 +15,21 @@
 		}
 	},
 
-	"postCreateCommand": "bash .devcontainer/setup.sh",
-	"postAttachCommand": "bash .devcontainer/capabilities.sh",
+	// Never fatal: a failed postCreate leaves a broken Codespace, and the
+	// script reports its own problems instead.
+	"postCreateCommand": "bash .devcontainer/setup.sh || true",
+	"postAttachCommand": "bash .devcontainer/capabilities.sh || true",
 
+	// Free-tier machine size. Asking for more can fail to allocate.
 	"hostRequirements": {
-		"cpus": 4,
+		"cpus": 2,
 		"memory": "8gb",
 		"storage": "32gb"
 	},
 
 	"customizations": {
 		"vscode": {
-			"extensions": ["esbenp.prettier-vscode", "dbaeumer.vscode-eslint"],
 			"settings": {
-				"editor.formatOnSave": false,
 				"terminal.integrated.defaultProfile.linux": "bash"
 			}
 		}

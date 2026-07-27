@@ -11,8 +11,11 @@
   "scripts": {
     "dev": "npm run dev --workspace @zenvx/studio",
     "dev:forge": "npm run dev --workspace @zenvx/forge",
+    "start": "npm run start --workspace @zenvx/forge",
     "build": "npm run build --workspace @zenvx/schema && npm run build --workspace @zenvx/studio",
     "demo": "node demo/build-demo.mjs",
+    "doctor": "node .devcontainer/doctor.mjs",
+    "capabilities": "bash .devcontainer/capabilities.sh",
     "typecheck": "tsc -b packages/schema packages/studio packages/forge"
   },
   "license": "MIT"

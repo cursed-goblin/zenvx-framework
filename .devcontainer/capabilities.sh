@@ -1,53 +1,54 @@
 #!/usr/bin/env bash
-# Report what this machine can actually produce, so nobody waits 30 minutes
+# Report what this machine can actually produce, so nobody waits half an hour
 # for a build that was never going to work here.
-set -uo pipefail
 
-yes() { printf '  \033[32myes\033[0m  %s\n' "$1"; }
-no() { printf '  \033[31mno \033[0m  %s\n' "$1"; }
+ok() { printf '  \033[32myes\033[0m  %s\n' "$1"; }
+nope() { printf '  \033[31mno \033[0m  %s\n' "$1"; }
 
 loop=no
-if [ -e /dev/loop-control ] && losetup -f >/dev/null 2>&1; then
-	loop=yes
+if [ -e /dev/loop-control ] && command -v losetup >/dev/null 2>&1; then
+	if losetup -f >/dev/null 2>&1; then loop=yes; fi
 fi
 
-mountok=no
-if unshare --mount true >/dev/null 2>&1 || [ "$(id -u)" = "0" ] && mount --help >/dev/null 2>&1; then
-	mountok=yes
-fi
+have_lb=no
+command -v lb >/dev/null 2>&1 && have_lb=yes
 
 echo
 echo "ZenvX forge — what this machine can build"
 echo
 
-if [ "$loop" = "yes" ]; then
-	yes "output.iso        bootable ISO"
-	yes "output.hdd        raw disk image"
-	yes "image.qcow2       virtual machine disk"
-	yes "image.rpi         Raspberry Pi card image"
+if [ "$loop" = "yes" ] && [ "$have_lb" = "yes" ]; then
+	ok "output.iso        bootable ISO"
+	ok "output.hdd        raw disk image"
+	ok "image.qcow2       virtual machine disk"
+	ok "image.rpi         Raspberry Pi card image"
 else
-	no "output.iso        needs loop devices"
-	no "output.hdd        needs loop devices"
-	no "image.qcow2       needs loop devices"
-	no "image.rpi         needs loop devices"
+	nope "output.iso        no loop devices here"
+	nope "output.hdd        no loop devices here"
+	nope "image.qcow2       no loop devices here"
+	nope "image.rpi         no loop devices here"
 fi
 
-yes "image.oci         container image"
-yes "image.wsl         WSL rootfs tarball"
-yes "image.netboot     netboot bundle"
+if [ "$have_lb" = "yes" ]; then
+	ok "image.oci         container image"
+	ok "image.wsl         WSL rootfs tarball"
+	ok "image.netboot     netboot bundle"
+else
+	nope "image.oci         live-build is not installed"
+	nope "image.wsl         live-build is not installed"
+	nope "image.netboot     live-build is not installed"
+fi
 
 echo
 echo "Always available, on any machine:"
-yes "POST /api/compile  the full live-build tree, no privileges needed"
+ok "POST /api/compile  the whole live-build tree, no privileges needed"
 echo
 
 if [ "$loop" = "no" ]; then
 	cat <<'EOF'
 Codespaces does not hand out loop devices, so the disk-image finishes cannot
-run here. Everything else does. To get an ISO, either:
-
-  * run `docker compose up --build` on your own machine, or
-  * use a rootfs finish block here and convert it elsewhere.
+run here. To get an ISO, run `docker compose up --build` on your own machine
+with the same recipe.
 
 EOF
 fi
