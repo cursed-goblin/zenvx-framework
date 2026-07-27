@@ -7,7 +7,10 @@ export type Job = {
 	id: string
 	name: string
 	state: "queued" | "running" | "done" | "failed"
+	/** Finish block id, e.g. "image.qcow2". */
 	target: string
+	/** Finish block config, used by the conversion step. */
+	targetCfg: Record<string, unknown>
 	workdir: string
 	log: string[]
 	artifactPath?: string
@@ -25,15 +28,17 @@ const queue: Job[] = []
 
 export const getJob = (id: string) => jobs.get(id)
 
+type TargetSpec = {
+	artifact: (cfg: Record<string, unknown>) => string
+	convert?: (cfg: Record<string, unknown>) => string
+}
+
 /**
  * What each finish block leaves in the work directory, and the command that
- * turns the live-build output into it. `convert` is run after build.sh and is
- * allowed to be undefined when live-build already produced the artifact.
+ * turns the live-build output into it. `convert` is omitted when live-build
+ * already produced the artifact.
  */
-const TARGETS: Record<
-	string,
-	{ artifact: (cfg: Record<string, unknown>) => string; convert?: (cfg: Record<string, unknown>) => string }
-> = {
+const TARGETS: Record<string, TargetSpec> = {
 	"output.iso": { artifact: () => "live-image-amd64.hybrid.iso" },
 	"output.hdd": { artifact: () => "live-image-amd64.img" },
 	"image.qcow2": {
@@ -41,14 +46,18 @@ const TARGETS: Record<
 		convert: (cfg) => {
 			const fmt = String(cfg.format ?? "qcow2")
 			const opts = fmt === "qcow2" ? `-o cluster_size=${cfg.clusterSize ?? 65536}` : ""
-			return `qemu-img convert -f raw -O ${fmt} ${opts} live-image-amd64.img disk.${fmt} && qemu-img resize disk.${fmt} ${cfg.sizeGb ?? 20}G`
+			return [
+				`qemu-img convert -f raw -O ${fmt} ${opts} live-image-amd64.img disk.${fmt}`,
+				`qemu-img resize disk.${fmt} ${cfg.sizeGb ?? 20}G`,
+			].join(" && ")
 		},
 	},
 	"image.oci": {
 		artifact: (cfg) => (cfg.format === "docker" ? "image.docker.tar" : "image.oci.tar"),
 		convert: (cfg) => {
 			const out = cfg.format === "docker" ? "docker-archive:image.docker.tar" : "oci-archive:image.oci.tar"
-			return `tar -C chroot -cf rootfs.tar . && skopeo copy tar:rootfs.tar ${out}:${cfg.tag ?? "zenvx/distro:latest"}`
+			const tag = String(cfg.tag ?? "zenvx/distro:latest")
+			return `tar -C chroot --numeric-owner -cf rootfs.tar . && skopeo copy tar:rootfs.tar ${out}:${tag}`
 		},
 	},
 	"image.wsl": {
@@ -64,7 +73,9 @@ const TARGETS: Record<
 	},
 }
 
-/** The finish block decides the artifact. First one wins. */
+export const knownTargets = () => Object.keys(TARGETS)
+
+/** The finish block decides the artifact. First one in the recipe wins. */
 export function targetOf(recipe: Recipe): { id: string; cfg: Record<string, unknown> } {
 	for (const b of recipe.blocks) {
 		if (TARGETS[b.def]) return { id: b.def, cfg: (b.cfg ?? {}) as Record<string, unknown> }
@@ -92,14 +103,14 @@ export function enqueue(recipe: Recipe, workdir: string): Job {
 		name: recipe.name,
 		state: "queued",
 		target: target.id,
+		targetCfg: target.cfg,
 		workdir,
 		log: [],
 		startedAt: Date.now(),
 	}
 	jobs.set(job.id, job)
-	queue.push({ ...job, ...(jobs.get(job.id) as Job) })
-	queue[queue.length - 1] = jobs.get(job.id) as Job
-	pump(target.cfg)
+	queue.push(job)
+	void pump()
 	return job
 }
 
@@ -114,11 +125,15 @@ function step(job: Job, command: string): Promise<number> {
 		}
 		child.stdout.on("data", push)
 		child.stderr.on("data", push)
+		child.on("error", (err) => {
+			job.log.push(`${err}\n`)
+			resolve(1)
+		})
 		child.on("close", (code) => resolve(code ?? 1))
 	})
 }
 
-async function pump(cfg: Record<string, unknown> = {}) {
+async function pump(): Promise<void> {
 	if (running) return
 	const job = queue.shift()
 	if (!job) return
@@ -126,6 +141,7 @@ async function pump(cfg: Record<string, unknown> = {}) {
 	job.state = "running"
 
 	const spec = TARGETS[job.target] ?? TARGETS["output.iso"]
+	const cfg = job.targetCfg ?? {}
 
 	try {
 		// `lb build` needs root. In production this runs inside the container
@@ -140,7 +156,7 @@ async function pump(cfg: Record<string, unknown> = {}) {
 		}
 	} catch (err) {
 		job.state = "failed"
-		job.log.push(String(err))
+		job.log.push(`${err}\n`)
 	} finally {
 		running = false
 		void pump()
