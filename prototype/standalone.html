@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZenvX — build an operating system</title>
+<style>
+:root{--ink:#2C2C2B;--muted:#7D7A75;--canvas:#fff;--soft:#F9F8F7;--surface:#F0EFED;--line:#E6E5E3;--brand:#2783DE;--brand-soft:#E5F2FC}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--soft)}
+body.kid{font-size:17px}
+body.kid .pro-only{display:none!important}
+.app{display:flex;flex-direction:column;height:100vh;min-height:620px}
+header{flex:0 0 56px;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--canvas);border-bottom:1px solid var(--line)}
+.logo{font-weight:700}
+.count{color:var(--muted);font-size:13px}
+.spacer{flex:1}
+.seg{display:inline-flex;background:var(--surface);border-radius:8px;padding:2px}
+.seg button{border:0;background:transparent;padding:8px 14px;min-height:36px;border-radius:6px;cursor:pointer;color:var(--muted);font:inherit;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--canvas);color:var(--ink);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--canvas);color:var(--ink);padding:10px 16px;min-height:44px;border-radius:8px;cursor:pointer;font:inherit}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.main{flex:1;display:flex;min-height:0}
+.palette{flex:0 0 226px;overflow-y:auto;background:var(--canvas);border-right:1px solid var(--line);padding:12px}
+.palette h3{margin:14px 4px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.palette button{display:block;width:100%;text-align:left;margin-bottom:4px;padding:9px 10px;min-height:40px;border:1px solid transparent;border-radius:8px;background:var(--soft);cursor:pointer;font:inherit;color:var(--ink)}
+.palette button:hover{border-color:var(--brand);background:var(--brand-soft)}
+.pro-badge{float:right;font-size:10px;color:var(--brand);background:var(--brand-soft);border-radius:4px;padding:1px 5px}
+.canvas-wrap{flex:1;position:relative;overflow:auto;background:radial-gradient(circle,var(--line) 1px,transparent 1px) 0 0/22px 22px,var(--soft)}
+.canvas{position:relative;min-height:100%;min-width:100%}
+.wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.node{position:absolute;min-width:178px;max-width:206px;padding:10px 12px;background:var(--canvas);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04);cursor:pointer}
+.node.sel{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.node .t{font-weight:600}
+.node .s{font-size:12px;color:var(--muted)}
+.node .x{position:absolute;top:6px;right:8px;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;line-height:1}
+.inspector{flex:0 0 300px;overflow-y:auto;background:var(--canvas);border-left:1px solid var(--line);padding:14px}
+.inspector h2{margin:0 0 2px;font-size:16px}
+.blurb{color:var(--muted);font-size:13px;margin:0 0 12px}
+.group{margin:16px 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:4px}
+.help{font-size:12px;color:var(--muted);margin-top:4px}
+.field input[type=text],.field input[type=number],.field textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--canvas);color:var(--ink)}
+.field textarea{min-height:90px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.field input[type=range]{width:100%}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.choices{display:flex;flex-wrap:wrap;gap:4px}
+.choices button{padding:7px 11px;min-height:36px;border:1px solid var(--line);border-radius:6px;background:var(--canvas);cursor:pointer;font:inherit;font-size:13px;color:var(--ink)}
+.choices button[aria-pressed=true]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:var(--surface);font-size:12px}
+.chip button{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:13px;line-height:1}
+.suggest button{margin:0 4px 4px 0;padding:4px 8px;border:1px dashed var(--line);border-radius:999px;background:transparent;cursor:pointer;font:inherit;font-size:12px;color:var(--muted)}
+.switch{position:relative;width:44px;height:26px;border-radius:999px;border:0;background:var(--surface);cursor:pointer;flex:0 0 44px}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .12s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch[aria-pressed=true]{background:var(--brand)}
+.switch[aria-pressed=true]::after{transform:translateX(18px)}
+.reveal{margin:10px 0;border:0;background:transparent;color:var(--brand);cursor:pointer;font:inherit;font-size:13px;padding:0}
+.overlay{position:fixed;inset:0;background:rgba(25,25,25,.55);display:none;align-items:center;justify-content:center;padding:24px}
+.overlay.on{display:flex}
+.machine{width:100%;max-width:740px}
+.screen{height:410px;border-radius:12px;overflow:hidden;position:relative;background:#191919;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px}
+.panel{position:absolute;left:0;right:0;bottom:0;height:34px;background:rgba(0,0,0,.35);display:flex;align-items:center;padding:0 10px;font-size:12px}
+.icons{position:absolute;top:12px;left:12px;display:grid;gap:10px}
+.icons div{font-size:12px;text-align:center;width:70px}
+.icons i{display:block;width:40px;height:40px;margin:0 auto 4px;border-radius:10px;background:rgba(255,255,255,.22)}
+</style>
+</head>
+<body class="kid">
+<div class="app">
+<header>
+<span class="logo">ZenvX</span><span id="count" class="count"></span><span class="spacer"></span>
+<span id="mode" class="seg"><button data-mode="kid" aria-pressed="true">Kid mode</button><button data-mode="pro" aria-pressed="false">Pro mode</button></span>
+<button id="run" class="btn primary">Start it</button>
+</header>
+<div class="main">
+<nav id="palette" class="palette"></nav>
+<div class="canvas-wrap"><div id="canvas" class="canvas"></div></div>
+<aside id="inspector" class="inspector"></aside>
+</div>
+</div>
+<div id="overlay" class="overlay"><div class="machine"><div id="screen" class="screen"></div><button id="close" class="btn" style="margin-top:12px">Close</button></div></div>
+
+<script>
+/* Field notation: "key|type|default|extra"; "!"=advanced, "?a=b"=dependsOn, "~G"=group. */
+var RAW = [
+["base.debian-stable","start","Debian stable","The Engine","Rock solid, a bit older.",0,["arch|choice|amd64|amd64,arm64,i386","nonfree|toggle|1"]],
+["base.debian-testing","start","Debian testing","The Fast Engine","Newer things, sometimes spicy.",0,["arch|choice|amd64|amd64,arm64"]],
+["base.ubuntu-lts","start","Ubuntu LTS","The Friendly Engine","Familiar and well supported.",0,["arch|choice|amd64|amd64,arm64"]],
+["desktop.xfce","looks","XFCE","Simple Desk","Light and quick.",0,[]],
+["desktop.gnome","looks","GNOME","Big Buttons Desk","Modern and touch friendly.",0,[]],
+["desktop.kde","looks","KDE Plasma","Everything Desk","Endlessly adjustable.",0,[]],
+["desktop.lxqt","looks","LXQt","Tiny Desk","For old machines.",0,[]],
+["desktop.mate","looks","MATE","Classic Desk","The old ways, maintained.",0,[]],
+["desktop.cinnamon","looks","Cinnamon","Cosy Desk","Warm and familiar.",0,[]],
+["desktop.tty","looks","No desktop","Just Text","Text only.",0,[]],
+["look.theme","looks","Theme","Colours","Accent colour and wallpaper.",0,["accent|color|#2783DE","wallpaper|choice|space|space,forest,sunset,ocean,candy,mono,plain","dark|toggle|0"]],
+["look.splash","looks","Splash","Hello Picture","The picture while it wakes up.",0,["text|text|Hello"]],
+["look.sounds","looks","Sounds","Beeps","Startup and click sounds.",0,["startup|toggle|1","clicks|toggle|0"]],
+["boot.splash","looks","Boot experience","Starting Up Screen","What you stare at while it starts.",1,["plymouth|toggle|1","theme?plymouth=1|choice|spinner|spinner,bgrt,fade-in,text","quiet|toggle|1","logLevel!|slider|3|0,7","showMessages|toggle|0","fsckProgress!|toggle|1"]],
+["app.browser","apps","Web browser","Internet","Firefox.",0,["homepage|text","adblock|toggle|1"]],
+["app.paint","apps","Paint","Painting","Draw pictures.",0,[]],
+["app.code","apps","Code editor","Coding","VSCodium.",0,[]],
+["app.blockcode","apps","Block coding","Puzzle Code","Scratch.",0,[]],
+["app.games","apps","Games","Games","A few good ones.",0,[]],
+["app.sandbox","apps","Sandbox","Building Blocks","Minetest.",0,[]],
+["app.media","apps","Media player","Watch","VLC.",0,[]],
+["app.musicmaker","apps","Music maker","Make Music","LMMS.",0,[]],
+["app.video","apps","Video editor","Movie Maker","Shotcut.",0,[]],
+["app.photo","apps","Photo editor","Photos","GIMP.",0,[]],
+["app.vector","apps","Vector editor","Shapes","Inkscape.",0,[]],
+["app.office","apps","Office","Homework","LibreOffice.",0,[]],
+["app.python","apps","Python","Python","Thonny and Python 3.",0,[]],
+["app.typing","apps","Typing tutor","Typing","Learn the keyboard.",0,[]],
+["app.maths","apps","Maths","Numbers","GeoGebra.",0,[]],
+["app.stars","apps","Stars","Space","Stellarium.",0,[]],
+["app.files","apps","Files","My Stuff","A file manager.",0,[]],
+["app.terminal","apps","Terminal","Command Box","A shell.",0,[]],
+["dev.workspace","apps","Developer workspace","My Desk","Shell, editor, dotfiles, git identity.",1,["shell~Shell|choice|bash|bash,zsh,fish,nushell","prompt~Shell|choice|plain|plain,starship,powerline","tmux~Shell|toggle|0","modernCli~Shell|tags|ripgrep, fd-find, bat|ripgrep,fd-find,bat,fzf,eza,zoxide,jq,btop","editor~Editor|choice|vscodium|vscodium,neovim,emacs,helix,none","languageServers!~Editor|tags||clangd,pyright,rust-analyzer,gopls","gitName~Git|text","gitEmail~Git|text","gitSign!~Git|toggle|0"]],
+["identity.brand","me","Brand","My Name For It","Name, icon, version.",0,["name|text|MyOS","icon|choice|rocket|rocket,star,cat,robot,leaf","version|text|0.1"]],
+["identity.user","me","User","Me","The first account.",0,["username|text|kid","autologin|toggle|1","sudo|toggle|0"]],
+["identity.hostname","me","Hostname","Computer Name","What the network calls it.",0,["hostname|text|myos"]],
+["identity.locale","me","Locale","Language","Language, keyboard, timezone.",0,["locale|text|en_US.UTF-8","keyboard|text|us","timezone|text|UTC"]],
+["identity.guard","me","Parental guard","Safe Mode","Filtering and time limits.",0,["safeSearch|toggle|1","blockList|tags||social,ads,adult","timeLimitMinutes|number|0|0,720,min"]],
+["boot.firstrun","me","First run","Hello Screen","What happens the very first boot.",1,["wizard|toggle|1","steps?wizard=1|tags|welcome, language, user, finish|welcome,language,keyboard,user,wifi,timezone,finish","oemMode|toggle|0","regenMachineId!|toggle|1","regenSshKeys!|toggle|1"]],
+["hood.packages","under-the-hood","Extra packages","More Programs","Anything else from the archive.",0,["packages|tags||htop,neofetch,curl,git"]],
+["hood.remove","under-the-hood","Remove packages","Take Out","Strip things you do not want.",0,["packages|tags||games,libreoffice"]],
+["hood.firewall","under-the-hood","Firewall","Door Guard","ufw, closed by default.",0,["enabled|toggle|1","allow|tags||ssh,http,https"]],
+["hood.ssh","under-the-hood","SSH","Remote Door","Log in from another machine.",0,["enabled|toggle|0","passwordAuth?enabled=1|toggle|0","keys?enabled=1|area||one public key per line"]],
+["hood.updates","under-the-hood","Updates","Keep Fresh","Unattended upgrades.",0,["auto|toggle|1","securityOnly|toggle|1","reboot!|toggle|0"]],
+["hood.swap","under-the-hood","Swap","Extra Memory","A swap file.",0,["sizeMb|number|2048|0,65536,MB"]],
+["hood.hook","under-the-hood","Custom hook","My Own Script","Shell that runs inside the image.",0,["script|area||runs in the chroot as root"]],
+["kernel.build","under-the-hood","Kernel build","The Brain","Which kernel, and what goes in the initramfs.",1,["flavour~Kernel|choice|stock|stock,lts,mainline,rt,hardened,liquorix","version!~Kernel|text","microcode~Kernel|toggle|1","headers~Kernel|toggle|1","dkms!~Kernel|toggle|0","initramfsModules~Initramfs|choice|dep|dep,most,list","initramfsCompression~Initramfs|choice|zstd|zstd,lz4,xz,gzip","modules!~Initramfs|tags||kvm,vfio-pci,i915,amdgpu","blacklist!~Initramfs|tags||nouveau,pcspkr","configFragment!~Initramfs|area||CONFIG_ options, one per line"]],
+["kernel.tuning","under-the-hood","Kernel tuning","Speed Knobs","Scheduling, memory and latency.",1,["governor~CPU|choice|schedutil|performance,powersave,ondemand,schedutil","timerHz!~CPU|choice|250|100,250,300,1000","preempt~CPU|choice|voluntary|none,voluntary,full,rt","isolcpus!~CPU|text","mitigations!~CPU|toggle|1","ioScheduler~IO|choice|none|none,mq-deadline,bfq,kyber","swappiness~Memory|slider|60|0,200","dirtyRatio!~Memory|slider|20|1,90,%","vfsCachePressure!~Memory|slider|100|10,500","thp~Memory|choice|madvise|always,madvise,never","ksm!~Memory|toggle|0","lockdown!~Safety|choice|none|none,integrity,confidentiality","panicOnOops!~Safety|toggle|0","sysctl!~Safety|area||one sysctl per line"]],
+["storage.root","under-the-hood","Root filesystem","Where Things Live","Filesystem, mount options, snapshots.",1,["fs~Filesystem|choice|ext4|ext4,btrfs,xfs,zfs,f2fs","label~Filesystem|text|zenvx-root","mountOptions!~Filesystem|text|noatime","discard~Filesystem|toggle|1","compression?fs=btrfs~Filesystem|choice|zstd|none,zstd,lzo,zlib","compressionLevel!?fs=btrfs~Filesystem|slider|3|1,15","subvolumes?fs=btrfs~Filesystem|tags|@, @home|@,@home,@var,@snapshots","snapshots~Snapshots|choice|none|none,snapper,timeshift","keepDaily?snapshots=snapper~Snapshots|number|7|0,90"]],
+["storage.crypt","under-the-hood","Disk encryption","The Lock","LUKS2, and how hard it is to crack.",1,["enabled|toggle|0","cipher?enabled=1|choice|aes-xts-plain64|aes-xts-plain64,serpent-xts-plain64","keySize?enabled=1|choice|512|256,512","pbkdfMemory!?enabled=1|number|1048576|32768,4194304,KiB","tpm2?enabled=1|toggle|0","detachedHeader!?enabled=1|toggle|0"]],
+["storage.layout","under-the-hood","Partition layout","Sharing The Disk","How the disk is carved up.",1,["table|choice|gpt|gpt,mbr","espSizeMb|number|512|100,4096,MB","separateHome|toggle|0","homeSizeGb?separateHome=1|number|50|5,4000,GB","separateVar!|toggle|0"]],
+["storage.lvm","under-the-hood","LVM","Stretchy Disks","Volume groups and thin pools.",1,["enabled|toggle|0","vgName?enabled=1|text|zenvx","thinPool!?enabled=1|toggle|0"]],
+["storage.raid","under-the-hood","RAID","Spare Copies","mdadm arrays.",1,["enabled|toggle|0","level?enabled=1|choice|1|0,1,5,6,10","devices?enabled=1|tags||/dev/sda,/dev/sdb","spare!?enabled=1|number|0|0,4"]],
+["storage.swap","under-the-hood","Swap and zram","Spare Memory","Swap file, partition or compressed RAM.",1,["mode|choice|file|none,file,partition,zram","sizeMb?mode=file|number|2048|0,131072,MB","zramPercent?mode=zram|slider|50|10,200,%","hibernate!|toggle|0"]],
+["security.mac","under-the-hood","Access control","The Rulebook","AppArmor or SELinux.",1,["system|choice|apparmor|apparmor,selinux,none","mode?system=apparmor|choice|enforce|enforce,complain","customProfile!|area||AppArmor profile text"]],
+["security.boot","under-the-hood","Secure Boot","Signed Start","Signed kernels and modules.",1,["secureBoot|toggle|1","shim?secureBoot=1|toggle|1","signModules!?secureBoot=1|toggle|1","measuredBoot!|toggle|0"]],
+["security.hardening","under-the-hood","Hardening","Tighten Up","Kernel and userland defaults.",1,["sysctlHardening|toggle|1","kptrRestrict!|choice|1|0,1,2","dmesgRestrict!|toggle|1","userNamespaces!|toggle|1","umask|choice|022|022,027,077","coreDumps|toggle|0","systemdHardening!|toggle|1"]],
+["security.access","under-the-hood","Accounts and sudo","Who Can Do What","Passwords, sudo and lockouts.",1,["rootLocked|toggle|1","sudoNoPassword|toggle|0","sudoTimeout!|number|15|0,240,min","minPasswordLength|number|12|6,64","faillockAttempts!|number|5|0,20"]],
+["security.audit","under-the-hood","Audit and logs","The Diary","auditd, journald, remote logging.",1,["auditd|toggle|0","rules!?auditd=1|area||audit rules, one per line","journalStorage|choice|persistent|volatile,persistent,none","journalMaxMb|number|500|50,10000,MB","compliance!|choice|none|none,cis,stig"]],
+["network.stack","under-the-hood","Network stack","The Wires","Who manages the interfaces.",1,["manager|choice|networkmanager|networkmanager,systemd-networkd,ifupdown,none","wifi|toggle|1","addressing|choice|dhcp|dhcp,static","address?addressing=static|text","gateway?addressing=static|text","macRandomization!|toggle|1","ipv6|choice|auto|auto,disabled,static"]],
+["network.dns","under-the-hood","DNS","The Phone Book","Resolvers, DNSSEC and DoT.",1,["resolver|choice|systemd-resolved|systemd-resolved,dnsmasq,unbound,none","servers|tags|9.9.9.9, 1.1.1.1|9.9.9.9,1.1.1.1,8.8.8.8","dnssec|toggle|1","dnsOverTls|choice|opportunistic|no,opportunistic,yes","cacheSize!|number|4096|0,65536"]],
+["network.vpn","under-the-hood","VPN","Secret Tunnel","WireGuard or OpenVPN.",1,["kind|choice|none|none,wireguard,openvpn","iface?kind=wireguard|text|wg0","endpoint?kind=wireguard|text","killSwitch?kind=wireguard|toggle|1","autoconnect|toggle|0"]],
+["network.time","under-the-hood","Time","The Clock","NTP and the hardware clock.",1,["client|choice|systemd-timesyncd|systemd-timesyncd,chrony,none","servers|tags|pool.ntp.org|pool.ntp.org,time.cloudflare.com","rtcLocal!|toggle|0","nts!|toggle|0"]],
+["network.share","under-the-hood","File sharing","Sharing","Samba, NFS and discovery.",1,["samba|toggle|0","sambaWorkgroup?samba=1|text|WORKGROUP","nfs|toggle|0","avahi|toggle|1"]],
+["gfx.drivers","under-the-hood","Graphics drivers","Picture Chip","GPU drivers and acceleration.",1,["vendor|choice|auto|auto,mesa,nvidia,nouveau,amdgpu,intel,vm","nvidiaBranch!?vendor=nvidia|choice|production|production,new-feature,legacy","primeOffload?vendor=nvidia|toggle|0","vaapi|toggle|1","vulkan|toggle|1","earlyKms!|toggle|1"]],
+["gfx.session","under-the-hood","Display session","The Screen","Wayland or X11, and the compositor.",1,["protocol|choice|wayland|wayland,x11","compositor|choice|desktop-default|desktop-default,sway,hyprland,i3,bspwm,openbox","displayManager|choice|lightdm|lightdm,gdm3,sddm,greetd,none","scaling|choice|1|1,1.25,1.5,2","vrr!|toggle|0","gaps!|number|0|0,60,px"]],
+["gfx.gaming","under-the-hood","Gaming stack","Game Boost","Steam, Proton and overlays.",1,["steam|toggle|0","proton?steam=1|toggle|1","lutris|toggle|0","gamemode|toggle|1","mangohud|toggle|0","shaderCacheMb!|number|1024|0,32768,MB"]],
+["gfx.audio","under-the-hood","Audio","Sound Engine","PipeWire, latency and codecs.",1,["server|choice|pipewire|pipewire,pulseaudio,jack,none","profile|choice|desktop|desktop,low-latency,studio","sampleRate|choice|48000|44100,48000,96000,192000","quantum!?profile=low-latency|number|256|32,2048,frames","bluetoothCodecs|tags|SBC, AAC|SBC,AAC,aptX,LDAC"]],
+["dev.toolchain","under-the-hood","Toolchains","Maker Tools","Compilers and runtimes in the image.",1,["c~Languages|toggle|1","cCompiler?c=1~Languages|choice|gcc|gcc,clang,both","rust~Languages|toggle|0","go~Languages|toggle|0","node~Languages|toggle|0","python~Languages|toggle|1","ccache~Build|toggle|1","ccacheSize?ccache=1~Build|number|10|1,500,GB","crossTargets!~Build|tags||arm64,armhf,riscv64"]],
+["dev.containers","under-the-hood","Containers","Boxes","Docker or Podman.",1,["engine|choice|podman|podman,docker,lxc,none","rootless|toggle|1","storageDriver!|choice|overlay2|overlay2,btrfs,fuse-overlayfs","compose|toggle|1","registries!|tags||docker.io,quay.io,ghcr.io","k3s|toggle|0"]],
+["dev.virt","under-the-hood","Virtualisation","Computer Inside A Computer","KVM and passthrough.",1,["kvm|toggle|1","manager?kvm=1|toggle|1","nested!|toggle|0","vfioIds!|tags||10de:2484","hugepagesGb!|number|0|0,512,GB"]],
+["pkg.apt","under-the-hood","apt and repositories","The App Shop","Where packages come from.",1,["repos~Sources|area||one sources.list line per row","keyUrls~Sources|tags","mirrorSnapshot!~Sources|text","pinning!~Priorities|area||apt_preferences stanzas","hold~Priorities|tags||linux-image-amd64,firefox-esr","recommends~Behaviour|toggle|1","suggests~Behaviour|toggle|0","allowUnauth!~Behaviour|toggle|0"]],
+["pkg.universal","under-the-hood","Universal packages","More Apps","Flatpak, Snap, AppImage, Nix.",1,["flatpak|toggle|1","flathub?flatpak=1|toggle|1","flatpakApps?flatpak=1|tags||org.gimp.GIMP,org.blender.Blender","snap|toggle|0","appimage|toggle|0","nix!|toggle|0"]],
+["pkg.reproducible","under-the-hood","Reproducible builds","Same Every Time","Build the same bytes twice.",1,["enabled|toggle|0","sourceDateEpoch?enabled=1|text","manifest|toggle|1","sbom!|toggle|0","signImage!|toggle|0"]],
+["boot.loader","under-the-hood","Bootloader","The Ignition","What appears before the kernel.",1,["loader~Loader|choice|grub|grub,systemd-boot,refind,syslinux","firmware~Loader|choice|both|uefi,bios,both","timeout~Menu|slider|5|0,60,s","hidden~Menu|toggle|0","osProber~Entries|toggle|1","recovery~Entries|toggle|1","memtest~Entries|toggle|0","extraEntries!~Entries|area||appended to 40_custom"]],
+["output.iso","finish","ISO image","Make The Disc","A bootable ISO for a USB stick.",0,["installer|toggle|1","volumeLabel|text|ZENVX"]],
+["output.hdd","finish","Disk image","Make The Disk","A raw image to write to a drive.",0,["sizeGb|number|8|2,512,GB"]],
+["image.qcow2","finish","Virtual machine disk","Pretend Computer","Boot it in QEMU or the cloud.",1,["format|choice|qcow2|qcow2,raw,vmdk,vdi,vhdx","sizeGb|number|20|2,4096,GB","sparse|toggle|1","virtio|toggle|1","serialConsole|toggle|1"]],
+["image.oci","finish","Container image","Shipping Box","The same system as an OCI image.",1,["format|choice|oci|oci,docker","tag|text|zenvx/mydistro:latest","squash|toggle|1","entrypoint!|text|/bin/bash","stripDocs|toggle|1"]],
+["image.wsl","finish","WSL tarball","Linux Inside Windows","Import it into Windows.",1,["defaultUser|text|zenvx","systemd|toggle|1","interop|toggle|1","automount|toggle|1"]],
+["image.rpi","finish","Raspberry Pi image","Tiny Computer Card","An SD card image for a Pi.",1,["model|choice|pi4|pi5,pi4,pi3,zero2","gpuMem|slider|76|16,512,MB","uart|toggle|0","overlays!|tags||vc4-kms-v3d,disable-bt","headless|toggle|0"]],
+["image.netboot","finish","Netboot bundle","Boot Over The Wire","PXE or iPXE for a whole room.",1,["protocol|choice|ipxe|pxe,ipxe","rootTransport|choice|http|http,nfs","serverUrl|text","toRam|toggle|1"]],
+["image.ostree","finish","Immutable system","Cannot Be Broken","Image updates with rollback.",1,["remote|text","branch|text|zenvx/stable/x86_64","autoUpdate|toggle|1","rollbackDepth|number|2|1,10"]]
+];
+
+var TITLES={fs:"Filesystem",thp:"Transparent huge pages",kvm:"KVM",dkms:"DKMS",tpm2:"TPM 2.0",ipv6:"IPv6",dnssec:"DNSSEC",vaapi:"VA-API",ssh:"SSH",uart:"UART",k3s:"k3s",sbom:"SBOM",nts:"NTS",nfs:"NFS",vrr:"Variable refresh rate"};
+function titleize(k){if(TITLES[k])return TITLES[k];var s=k.replace(/([A-Z])/g," $1");return s.charAt(0).toUpperCase()+s.slice(1)}
+
+function parseField(spec){
+	var p=spec.split("|"),key=p[0],type=p[1]||"toggle",def=p[2]===undefined?"":p[2],extra=p[3]||"",f={type:type};
+	var g=key.indexOf("~");if(g>-1){f.group=key.slice(g+1);key=key.slice(0,g)}
+	var d=key.indexOf("?");if(d>-1){var dd=key.slice(d+1).split("=");f.dependsOn={key:dd[0],equals:dd[1]==="1"?true:dd[1]==="0"?false:dd[1]};key=key.slice(0,d)}
+	if(key.charAt(key.length-1)==="!"){f.advanced=true;key=key.slice(0,-1)}
+	f.key=key;f.label=titleize(key);
+	if(type==="toggle")f.def=def==="1";
+	else if(type==="number"||type==="slider"){var e=extra.split(",");f.def=Number(def||0);f.min=Number(e[0]||0);f.max=Number(e[1]||100);if(e[2])f.unit=e[2]}
+	else if(type==="choice"){f.def=def;f.options=extra?extra.split(","):[]}
+	else if(type==="tags"){f.def=def;f.suggestions=extra?extra.split(","):[]}
+	else{f.def=def;if(extra)f.hint=extra}
+	return f;
+}
+
+var BLOCKS=RAW.map(function(r){return{id:r[0],category:r[1],label:r[2],kidLabel:r[3],blurb:r[4],proOnly:!!r[5],fields:r[6].map(parseField)}});
+var byId=function(id){for(var i=0;i<BLOCKS.length;i++)if(BLOCKS[i].id===id)return BLOCKS[i]};
+var CATS=["start","looks","apps","me","under-the-hood","finish"];
+var CATLABEL={start:"Start here",looks:"How it looks",apps:"Things to do",me:"Make it mine","under-the-hood":"Under the hood",finish:"Finish"};
+var TOTALFIELDS=BLOCKS.reduce(function(n,b){return n+b.fields.length},0);
+
+var S={mode:"kid",blocks:[],sel:null,adv:false},seq=0;
+
+function addBlock(id){
+	for(var i=0;i<S.blocks.length;i++)if(S.blocks[i].def===id)return;
+	var d=byId(id),cfg={};
+	d.fields.forEach(function(f){if(f.def!==undefined)cfg[f.key]=f.def});
+	var uid="b"+(++seq);
+	S.blocks.push({uid:uid,def:id,cfg:cfg});S.sel=uid;render();
+}
+function el(tag,props,kids){
+	var n=document.createElement(tag);props=props||{};
+	for(var k in props){var v=props[k];if(v==null)continue;
+		if(k==="class")n.className=v;else if(k==="text")n.textContent=v;
+		else if(k.slice(0,2)==="on")n.addEventListener(k.slice(2),v);else n.setAttribute(k,v)}
+	(kids||[]).forEach(function(c){if(c)n.appendChild(c)});return n;
+}
+
+function renderPalette(){
+	var root=document.getElementById("palette");root.textContent="";
+	CATS.forEach(function(cat){
+		var list=BLOCKS.filter(function(b){return b.category===cat&&(S.mode==="pro"||!b.proOnly)});
+		if(!list.length)return;
+		root.appendChild(el("h3",{text:CATLABEL[cat]}));
+		list.forEach(function(b){
+			var used=S.blocks.some(function(x){return x.def===b.id});
+			var btn=el("button",{title:b.blurb,style:used?"opacity:.45":"",onclick:function(){addBlock(b.id)}});
+			if(b.proOnly)btn.appendChild(el("span",{class:"pro-badge",text:"pro"}));
+			btn.appendChild(document.createTextNode(S.mode==="kid"?b.kidLabel:b.label));
+			root.appendChild(btn);
+		});
+	});
+}
+
+var RANK={start:0,looks:1,apps:2,me:3,"under-the-hood":4,finish:5},NW=190;
+function renderCanvas(){
+	var root=document.getElementById("canvas");root.textContent="";
+	var cols={},placed=S.blocks.map(function(b){
+		var r=RANK[byId(b.def).category];cols[r]=(cols[r]==null?-1:cols[r])+1;
+		return{uid:b.uid,def:b.def,x:28+r*(NW+46),y:22+cols[r]*102,r:r};
+	});
+	var svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("class","wires");root.appendChild(svg);
+	var byRank={};placed.forEach(function(p){(byRank[p.r]=byRank[p.r]||[]).push(p)});
+	var ranks=Object.keys(byRank).map(Number).sort(function(a,b){return a-b});
+	for(var i=0;i<ranks.length-1;i++){
+		byRank[ranks[i]].forEach(function(a){byRank[ranks[i+1]].forEach(function(b){
+			var x1=a.x+NW,y1=a.y+30,x2=b.x,y2=b.y+30,mx=(x1+x2)/2;
+			var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+			path.setAttribute("d","M"+x1+","+y1+" C"+mx+","+y1+" "+mx+","+y2+" "+x2+","+y2);
+			path.setAttribute("stroke","#2783DE");path.setAttribute("stroke-width","2.5");
+			path.setAttribute("fill","none");path.setAttribute("opacity","0.45");svg.appendChild(path);
+		})});
+	}
+	placed.forEach(function(p){
+		var d=byId(p.def);
+		var node=el("div",{class:"node"+(S.sel===p.uid?" sel":""),style:"left:"+p.x+"px;top:"+p.y+"px",onclick:function(){S.sel=p.uid;render()}});
+		node.appendChild(el("div",{class:"t",text:S.mode==="kid"?d.kidLabel:d.label}));
+		node.appendChild(el("div",{class:"s",text:d.fields.length+(d.fields.length===1?" setting":" settings")}));
+		node.appendChild(el("button",{class:"x",title:"Remove",text:"×",onclick:function(e){e.stopPropagation();S.blocks=S.blocks.filter(function(b){return b.uid!==p.uid});if(S.sel===p.uid)S.sel=null;render()}}));
+		root.appendChild(node);
+	});
+	var maxY=placed.reduce(function(m,p){return Math.max(m,p.y)},0);
+	root.style.height=(maxY+180)+"px";root.style.width=(28+6*(NW+46))+"px";
+}
+
+function control(b,f){
+	var val=b.cfg[f.key]!==undefined?b.cfg[f.key]:f.def;
+	function set(v){b.cfg[f.key]=v;render()}
+	if(f.type==="toggle")return el("div",{class:"row"},[el("span",{text:f.label}),el("button",{class:"switch","aria-pressed":String(!!val),"aria-label":f.label,onclick:function(){set(!val)}})]);
+	var wrap=el("div",{},[el("label",{text:f.label})]);
+	if(f.type==="choice"){
+		var row=el("div",{class:"choices"});
+		f.options.forEach(function(o){row.appendChild(el("button",{text:o,"aria-pressed":String(String(val)===o),onclick:function(){set(o)}}))});
+		wrap.appendChild(row);
+	}else if(f.type==="slider"){
+		var out=el("div",{class:"help",text:val+(f.unit?" "+f.unit:"")});
+		wrap.appendChild(el("input",{type:"range",min:f.min,max:f.max,value:String(val),oninput:function(e){out.textContent=e.target.value+(f.unit?" "+f.unit:"")},onchange:function(e){set(Number(e.target.value))}}));
+		wrap.appendChild(out);
+	}else if(f.type==="number"){
+		var ni=el("input",{type:"number",min:f.min,max:f.max,onchange:function(e){set(Number(e.target.value))}});ni.value=String(val);wrap.appendChild(ni);
+		if(f.unit)wrap.appendChild(el("div",{class:"help",text:f.unit}));
+	}else if(f.type==="color"){
+		var ci=el("input",{type:"color",onchange:function(e){set(e.target.value)}});ci.value=String(val||"#2783DE");wrap.appendChild(ci);
+	}else if(f.type==="area"){
+		var ta=el("textarea",{rows:"5",placeholder:f.hint||"",onchange:function(e){set(e.target.value)}});ta.value=String(val||"");wrap.appendChild(ta);
+		if(f.hint)wrap.appendChild(el("div",{class:"help",text:f.hint}));
+	}else if(f.type==="tags"){
+		var cur=String(val||"").split(",").map(function(s){return s.trim()}).filter(Boolean);
+		var chips=el("div",{class:"chips"});
+		cur.forEach(function(t){
+			var chip=el("span",{class:"chip",text:t});
+			chip.appendChild(el("button",{text:"×","aria-label":"Remove "+t,onclick:function(){set(cur.filter(function(x){return x!==t}).join(", "))}}));
+			chips.appendChild(chip);
+		});
+		wrap.appendChild(chips);
+		wrap.appendChild(el("input",{type:"text",placeholder:"Type and press Enter",onkeydown:function(e){if(e.key!=="Enter"||!e.target.value.trim())return;e.preventDefault();set(cur.concat([e.target.value.trim()]).join(", "))}}));
+		var sug=(f.suggestions||[]).filter(function(s){return cur.indexOf(s)<0}).slice(0,6);
+		if(sug.length){var sr=el("div",{class:"suggest"});sug.forEach(function(s){sr.appendChild(el("button",{text:"+ "+s,onclick:function(){set(cur.concat([s]).join(", "))}}))});wrap.appendChild(sr)}
+	}else{
+		var ti=el("input",{type:"text",placeholder:f.hint||"",onchange:function(e){set(e.target.value)}});ti.value=String(val||"");wrap.appendChild(ti);
+	}
+	return wrap;
+}
+
+function renderInspector(){
+	var root=document.getElementById("inspector");root.textContent="";
+	var b=null;S.blocks.forEach(function(x){if(x.uid===S.sel)b=x});
+	if(!b){root.appendChild(el("h2",{text:"Nothing picked"}));root.appendChild(el("p",{class:"blurb",text:S.mode==="kid"?"Pick a piece on the left to start building.":"Select a block to edit it. Pro mode reveals the expert catalog."}));return}
+	var d=byId(b.def);
+	root.appendChild(el("h2",{text:S.mode==="kid"?d.kidLabel:d.label}));
+	root.appendChild(el("p",{class:"blurb",text:d.blurb}));
+	var fields=d.fields.filter(function(f){
+		if(!f.dependsOn)return true;
+		var v=b.cfg[f.dependsOn.key];return v===f.dependsOn.equals||String(v)===String(f.dependsOn.equals);
+	});
+	var advCount=fields.filter(function(f){return f.advanced}).length;
+	var showAdv=S.mode==="pro"&&S.adv;
+	if(!showAdv)fields=fields.filter(function(f){return !f.advanced});
+	var lastGroup=null;
+	fields.forEach(function(f){
+		var g=f.group||null;
+		if(g!==lastGroup){lastGroup=g;if(g)root.appendChild(el("div",{class:"group",text:g}))}
+		root.appendChild(el("div",{class:"field"},[control(b,f)]));
+	});
+	if(!fields.length)root.appendChild(el("p",{class:"blurb",text:"Nothing to configure here."}));
+	if(S.mode==="pro"&&advCount)root.appendChild(el("button",{class:"reveal",text:showAdv?"Hide advanced settings":"Show "+advCount+" advanced settings",onclick:function(){S.adv=!S.adv;renderInspector()}}));
+}
+
+function renderHeader(){
+	var mb=S.blocks.reduce(function(n,b){var c=byId(b.def).category;return n+(c==="start"?900:c==="looks"?320:c==="apps"?140:c==="under-the-hood"?90:20)},0);
+	document.getElementById("count").textContent=S.blocks.length+" of "+BLOCKS.length+" blocks · "+TOTALFIELDS+" settings available · about "+(Math.round(mb/100)/10)+" GB";
+	var btns=document.querySelectorAll("#mode button");
+	for(var i=0;i<btns.length;i++)btns[i].setAttribute("aria-pressed",String(btns[i].getAttribute("data-mode")===S.mode));
+	document.body.className=S.mode==="kid"?"kid":"pro";
+}
+
+function render(){renderHeader();renderPalette();renderCanvas();renderInspector()}
+
+var WALL={space:"linear-gradient(160deg,#101828,#2783DE)",forest:"linear-gradient(160deg,#14281f,#46A171)",sunset:"linear-gradient(160deg,#3a1c1c,#D5803B)",ocean:"linear-gradient(160deg,#07243a,#2AA5B5)",candy:"linear-gradient(160deg,#3a1230,#E56ea0)",mono:"linear-gradient(160deg,#1b1b1b,#4a4a4a)",plain:"linear-gradient(160deg,#202020,#383836)"};
+function preview(){
+	var look=null,brand=null;
+	S.blocks.forEach(function(b){if(b.def==="look.theme")look=b;if(b.def==="identity.brand")brand=b});
+	var name=(brand&&brand.cfg.name)||"MyOS";
+	var screen=document.getElementById("screen");
+	document.getElementById("overlay").classList.add("on");
+	screen.style.background="#191919";screen.textContent="Starting "+name+"…";
+	setTimeout(function(){
+		screen.textContent="";
+		screen.style.background=WALL[look&&look.cfg.wallpaper]||WALL.plain;
+		var icons=el("div",{class:"icons"});
+		S.blocks.filter(function(b){return byId(b.def).category==="apps"}).slice(0,5).forEach(function(b){
+			var d=byId(b.def);
+			icons.appendChild(el("div",{},[el("i"),el("span",{text:S.mode==="kid"?d.kidLabel:d.label})]));
+		});
+		screen.appendChild(icons);
+		screen.appendChild(el("div",{class:"panel"},[el("span",{text:name})]));
+	},1300);
+}
+
+var modeBtns=document.querySelectorAll("#mode button");
+for(var i=0;i<modeBtns.length;i++)(function(btn){btn.addEventListener("click",function(){S.mode=btn.getAttribute("data-mode");render()})})(modeBtns[i]);
+document.getElementById("run").addEventListener("click",preview);
+document.getElementById("close").addEventListener("click",function(){document.getElementById("overlay").classList.remove("on")});
+
+["base.debian-stable","desktop.xfce","look.theme","app.browser","app.paint","identity.brand","output.iso"].forEach(addBlock);
+S.sel=null;render();
+</script>
+</body>
+</html>
