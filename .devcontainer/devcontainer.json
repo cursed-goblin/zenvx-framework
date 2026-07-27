@@ -1,0 +1,42 @@
+{
+	"name": "ZenvX forge",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+
+	// live-build, debootstrap and friends all want to be root. A Codespace is a
+	// disposable VM, so this is the cheap and honest option.
+	"remoteUser": "root",
+
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "22"
+		}
+	},
+
+	"forwardPorts": [8787],
+	"portsAttributes": {
+		"8787": {
+			"label": "ZenvX forge",
+			"onAutoForward": "openBrowser",
+			"protocol": "http"
+		}
+	},
+
+	"postCreateCommand": "bash .devcontainer/setup.sh",
+	"postAttachCommand": "bash .devcontainer/capabilities.sh",
+
+	"hostRequirements": {
+		"cpus": 4,
+		"memory": "8gb",
+		"storage": "32gb"
+	},
+
+	"customizations": {
+		"vscode": {
+			"extensions": ["esbenp.prettier-vscode", "dbaeumer.vscode-eslint"],
+			"settings": {
+				"editor.formatOnSave": false,
+				"terminal.integrated.defaultProfile.linux": "bash"
+			}
+		}
+	}
+}
