@@ -29,6 +29,7 @@ export const devToolchain: BlockDef = {
 	],
 	emit: (cfg) => {
 		const cc = String(cfg.cCompiler ?? "gcc")
+		const extras = list(cfg.pythonExtras).filter((p) => p !== "pip" && p !== "venv")
 		return {
 			packages: [
 				...(cfg.c !== false ? ["build-essential", ...(cc !== "gcc" ? ["clang", "lld"] : [])] : []),
@@ -50,11 +51,9 @@ export const devToolchain: BlockDef = {
 						(cfg.node === true ? `NODE_MAJOR=${cfg.nodeVersion ?? 22}\n` : ""),
 				},
 			],
-			hooks: [
-				...(cfg.python !== false && list(cfg.pythonExtras).filter((p) => !"pip venv".includes(p)).length
-					? [`pip3 install --break-system-packages ${list(cfg.pythonExtras).filter((p) => p !== "pip" && p !== "venv").join(" ")} || true`]
-					: []),
-			],
+			hooks: extras.length
+				? [`pip3 install --break-system-packages ${extras.join(" ")} || true`]
+				: [],
 			sizeMb:
 				(cfg.c !== false ? 480 : 0) +
 				(cfg.rust === true ? 900 : 0) +
@@ -108,6 +107,7 @@ export const devContainers: BlockDef = {
 	emit: (cfg) => {
 		const e = String(cfg.engine ?? "podman")
 		if (e === "none") return { sizeMb: 0 }
+		const mirrors = list(cfg.registries)
 		return {
 			packages: [
 				...(e === "docker" ? ["docker.io", ...(cfg.compose !== false ? ["docker-compose"] : [])] : []),
@@ -123,17 +123,20 @@ export const devContainers: BlockDef = {
 					? [
 						{
 							path: "etc/docker/daemon.json",
-							content: JSON.stringify(
-								{
-									"storage-driver": cfg.storageDriver ?? "overlay2",
-									"log-driver": "json-file",
-									"log-opts": { "max-size": `${cfg.logMaxMb ?? 50}m`, "max-file": "3" },
-									"registry-mirrors": list(cfg.registries).map((r) => `https://${r}`),
-									"live-restore": true,
-								},
-								null,
-								2,
-							) + "\n",
+							content:
+								JSON.stringify(
+									{
+										"storage-driver": cfg.storageDriver ?? "overlay2",
+										"log-driver": "json-file",
+										"log-opts": { "max-size": `${cfg.logMaxMb ?? 50}m`, "max-file": "3" },
+										"registry-mirrors": mirrors.map((r) =>
+											r.startsWith("http") ? r : `https://${r}`,
+										),
+										"live-restore": true,
+									},
+									null,
+									2,
+								) + "\n",
 						},
 					]
 					: []),
@@ -141,7 +144,7 @@ export const devContainers: BlockDef = {
 					? [
 						{
 							path: "etc/containers/registries.conf.d/zenvx.conf",
-							content: `unqualified-search-registries = [${list(cfg.registries).map((r) => `"${r}"`).join(", ") || '"docker.io"'}]\n`,
+							content: `unqualified-search-registries = [${mirrors.map((r) => `"${r}"`).join(", ") || '"docker.io"'}]\n`,
 						},
 					]
 					: []),
