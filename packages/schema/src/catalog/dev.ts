@@ -1,3 +1,4 @@
+import { mirrorHost, mirrorUrl } from "./registry"
 import { type BlockDef, list, yes } from "./types"
 
 export const devToolchain: BlockDef = {
@@ -129,9 +130,7 @@ export const devContainers: BlockDef = {
 										"storage-driver": cfg.storageDriver ?? "overlay2",
 										"log-driver": "json-file",
 										"log-opts": { "max-size": `${cfg.logMaxMb ?? 50}m`, "max-file": "3" },
-										"registry-mirrors": mirrors.map((r) =>
-											r.startsWith("http") ? r : `https://${r}`,
-										),
+										"registry-mirrors": mirrors.map(mirrorUrl),
 										"live-restore": true,
 									},
 									null,
@@ -144,7 +143,7 @@ export const devContainers: BlockDef = {
 					? [
 						{
 							path: "etc/containers/registries.conf.d/zenvx.conf",
-							content: `unqualified-search-registries = [${mirrors.map((r) => `"${r}"`).join(", ") || '"docker.io"'}]\n`,
+							content: `unqualified-search-registries = [${mirrors.map((r) => `"${mirrorHost(r)}"`).join(", ") || '"docker.io"'}]\n`,
 						},
 					]
 					: []),
